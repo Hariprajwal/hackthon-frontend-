@@ -1,89 +1,88 @@
 import { useState } from "react";
+import { apiRequest, saveTokens } from "./api";
 import "./homepage.css";
 
 export default function Login({ onLogin }) {
-  const [mode, setMode] = useState("login"); 
+  const [mode, setMode] = useState("login");
   // login | register | verify
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // ---------------- REGISTER ----------------
   const handleRegister = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    const response = await fetch("http://127.0.0.1:8000/register/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        username,
-        email,
-        password
-      })
-    });
+    try {
+      const { response, data } = await apiRequest("/register/", {
+        method: "POST",
+        body: JSON.stringify({ username, email, password }),
+      });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      alert("Registered! Check email for verification code 📩");
-      setMode("verify");
-    } else {
-      alert(data.detail || "Registration failed");
+      if (response.ok) {
+        alert(data.message || "Registered! Check email for verification code 📩");
+        setMode("verify");
+      } else {
+        alert(data.error || data.message || "Registration failed");
+      }
+    } catch (err) {
+      alert("Network error. Is the backend running?");
+    } finally {
+      setLoading(false);
     }
   };
 
   // ---------------- VERIFY ----------------
   const handleVerify = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    const response = await fetch("http://127.0.0.1:8000/verify/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        username,
-        verification_code: verificationCode
-      })
-    });
+    try {
+      const { response, data } = await apiRequest("/verify/", {
+        method: "POST",
+        body: JSON.stringify({ username, verification_code: verificationCode }),
+      });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      alert("Account Verified ✅ You can now login");
-      setMode("login");
-    } else {
-      alert(data.detail || "Verification failed");
+      if (response.ok) {
+        alert(data.message || "Account Verified ✅ You can now login");
+        setMode("login");
+      } else {
+        alert(data.error || data.message || "Verification failed");
+      }
+    } catch (err) {
+      alert("Network error. Is the backend running?");
+    } finally {
+      setLoading(false);
     }
   };
 
   // ---------------- LOGIN ----------------
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    const response = await fetch("http://127.0.0.1:8000/login/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        username,
-        password
-      })
-    });
+    try {
+      const { response, data } = await apiRequest("/login/", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
 
-    const data = await response.json();
-
-    if (response.ok) {
-      // Save token
-      localStorage.setItem("token", data.access || data.token);
-      onLogin(username);
-    } else {
-      alert(data.detail || "Login failed");
+      if (response.ok) {
+        // Save JWT tokens
+        saveTokens(data.data.access, data.data.refresh);
+        // Pass username to App
+        onLogin(data.data.user_name);
+      } else {
+        alert(data.error || data.message || "Login failed");
+      }
+    } catch (err) {
+      alert("Network error. Is the backend running?");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -109,17 +108,19 @@ export default function Login({ onLogin }) {
           <form onSubmit={handleLogin}>
             <div className="form-group">
               <label>Username</label>
-              <input value={username} onChange={(e)=>setUsername(e.target.value)} />
+              <input value={username} onChange={(e) => setUsername(e.target.value)} />
             </div>
 
             <div className="form-group">
               <label>Password</label>
-              <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
 
-            <button type="submit" className="add-btn">Login</button>
+            <button type="submit" className="add-btn" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
+            </button>
 
-            <p onClick={()=>setMode("register")} style={{cursor:"pointer", marginTop:"15px"}}>
+            <p onClick={() => setMode("register")} style={{ cursor: "pointer", marginTop: "15px" }}>
               Don't have account? Register
             </p>
           </form>
@@ -130,20 +131,26 @@ export default function Login({ onLogin }) {
           <form onSubmit={handleRegister}>
             <div className="form-group">
               <label>Username</label>
-              <input value={username} onChange={(e)=>setUsername(e.target.value)} />
+              <input value={username} onChange={(e) => setUsername(e.target.value)} />
             </div>
 
             <div className="form-group">
               <label>Email</label>
-              <input value={email} onChange={(e)=>setEmail(e.target.value)} />
+              <input value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 
             <div className="form-group">
               <label>Password</label>
-              <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
 
-            <button type="submit" className="add-btn">Register</button>
+            <button type="submit" className="add-btn" disabled={loading}>
+              {loading ? "Registering..." : "Register"}
+            </button>
+
+            <p onClick={() => setMode("login")} style={{ cursor: "pointer", marginTop: "15px" }}>
+              Already have an account? Login
+            </p>
           </form>
         )}
 
@@ -152,10 +159,12 @@ export default function Login({ onLogin }) {
           <form onSubmit={handleVerify}>
             <div className="form-group">
               <label>Verification Code</label>
-              <input value={verificationCode} onChange={(e)=>setVerificationCode(e.target.value)} />
+              <input value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} />
             </div>
 
-            <button type="submit" className="add-btn">Verify</button>
+            <button type="submit" className="add-btn" disabled={loading}>
+              {loading ? "Verifying..." : "Verify"}
+            </button>
           </form>
         )}
 

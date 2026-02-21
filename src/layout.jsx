@@ -1,6 +1,6 @@
 import React from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { FaUserCircle, FaSignOutAlt } from "react-icons/fa";
+import { FaUserCircle } from "react-icons/fa";
 import "./homepage.css";
 
 export default function Layout({ user, setUser }) {
@@ -44,9 +44,9 @@ export default function Layout({ user, setUser }) {
           </div>
 
           <div className="logout">
-           <button onClick={() => setUser(null)}>
-            Logout
-                </button>
+            <button onClick={() => setUser()}>
+              Logout
+            </button>
           </div>
         </div>
 
