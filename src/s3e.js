@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 const S3E_SECRET = "vault-encryption-secret-key-2026"; // Same master secret
-const WIN = 4; // Bucket window size (paper default)
+const WIN = 2; // Bucket window size (reduced for broader match support)
 
 // ─── HELPER: Derive HMAC key via PBKDF2 ─────────────────────────────
 async function deriveHMACKey(secret, salt) {
@@ -77,7 +77,7 @@ async function s3eKeyGen() {
 
 // ═══════════════════════════════════════════════════════════════════════
 // BUCKETIZE: Split string into overlapping windows of size `win`
-// "hackathon" → ["hack","acka","ckat","kath","atho","thon"]
+// "hackathon" → ["ha","ac","ck","ka","at","th","ho","on"]
 // ═══════════════════════════════════════════════════════════════════════
 function bucketize(str, win = WIN) {
     const s = str.toLowerCase();
@@ -88,7 +88,10 @@ function bucketize(str, win = WIN) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// ADD DUMMIES: Insert ~20% random dummy buckets for security padding
+// ADD DUMMIES: APPEND ~20% random dummy buckets at the END
+// CRITICAL: Dummies must go at the end, not between real buckets,
+// otherwise contiguous bucket sequences break and multi-bucket
+// (long) queries will never match. (Paper Section 4.1 — simplified)
 // ═══════════════════════════════════════════════════════════════════════
 function addDummies(buckets, ratio = 0.2) {
     const num = Math.max(1, Math.ceil(buckets.length * ratio));
@@ -98,11 +101,9 @@ function addDummies(buckets, ratio = 0.2) {
     for (let i = 0; i < num; i++) {
         let d = "\x01";
         for (let j = 0; j < WIN - 1; j++) d += chars[Math.floor(Math.random() * chars.length)];
-        const pos = Math.floor(Math.random() * (result.length + 1));
-        result.splice(pos, 0, d);
-        dummyPositions.push(pos);
+        dummyPositions.push(result.length); // Track position before pushing
+        result.push(d);                      // Append at end — preserves real bucket order
     }
-    dummyPositions.sort((a, b) => a - b);
     return { padded: result, dummyPositions, dummyCount: num };
 }
 
@@ -192,15 +193,17 @@ export async function s3ePreProcess(plaintext, win = WIN) {
 // ═══════════════════════════════════════════════════════════════════════
 // SEARCH TOKEN GENERATION (Paper: Algorithm 3 — SrchToken)
 //
-// Input:  query string (must be >= win chars)
+// Input:  query string (>= 2 chars with WIN=2)
 // Output: array of PRF tokens (one per query bucket)
 //
 // These tokens let the server do FM backward search by comparing
 // against enc_fm entries — without ever seeing plaintext buckets.
+// Supports: substring, startsWith, endsWith, exact — all via FM-index.
 // ═══════════════════════════════════════════════════════════════════════
 export async function s3eSrchToken(query, win = WIN) {
     if (query.length < win) {
-        throw new Error(`Query must be at least ${win} characters`);
+        // For very short queries (1 char with WIN=2), pad to min window
+        query = query.padEnd(win, "\x00");
     }
     const keys = await s3eKeyGen();
     const qBuckets = bucketize(query, win);
