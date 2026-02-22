@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 
 import { hasToken, clearTokens } from "./api";
 import Layout from "./layout";
-import HomePage from "./homepage";
 import Vault from "./vault";
 import Settings from "./settings";
 import Login from "./login";
@@ -40,9 +39,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Layout user={user} setUser={handleLogout} />}>
-          <Route index element={<HomePage user={user} />} />
-          <Route path="vault" element={<Vault />} />
-          <Route path="settings" element={<Settings />} />
+          <Route index element={<Vault />} />
+          <Route path="settings" element={<Settings user={user} setUser={handleLogout} />} />
         </Route>
       </Routes>
     </Router>

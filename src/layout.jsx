@@ -24,13 +24,6 @@ export default function Layout({ user, setUser }) {
                 className={location.pathname === "/" ? "active" : ""}
                 onClick={() => navigate("/")}
               >
-                Home
-              </button>
-
-              <button
-                className={location.pathname === "/vault" ? "active" : ""}
-                onClick={() => navigate("/vault")}
-              >
                 Vault
               </button>
 
